@@ -29,23 +29,40 @@ app.use(helmet());
 app.use(morgan('dev'));
 
 // ── CORS ────────────────────────────────────
-app.use(
-  cors({
-    origin: [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'http://localhost:5000',
-      'http://localhost:5001',
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:5000',
-      'http://127.0.0.1:5001',
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+// ── CORS ────────────────────────────────────
+// Allow origins from environment variable FRONTEND_URL (comma-separated),
+// fall back to local dev and known frontend Vercel domain.
+const defaultOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'http://localhost:5001',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5000',
+  'http://127.0.0.1:5001',
+  'https://codereview-ai-frontend.vercel.app',
+];
+
+const envFrontend = process.env.FRONTEND_URL || process.env.FRONTEND_URLS || '';
+const envOrigins = envFrontend.split(',').map(s => s.trim()).filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // allow non-browser requests like server-to-server (no origin)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+};
+
+app.use(cors(corsOptions));
+// Explicitly handle preflight requests
+app.options('*', cors(corsOptions));
 
 // ── Rate Limiting ────────────────────────────
 const limiter = rateLimit({
