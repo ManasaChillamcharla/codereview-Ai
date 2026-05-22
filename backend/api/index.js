@@ -10,8 +10,19 @@ import rateLimit from 'express-rate-limit';
 import reviewRoutes from './routes/review.js';
 import historyRoutes from './routes/history.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { connectDB } from '../config/db.js';
 
 const app = express();
+
+// ── Database Connection (Serverless Support) ─
+app.use(async (_req, _res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ── Security & Logging ──────────────────────
 app.use(helmet());
@@ -53,6 +64,15 @@ app.get(['/api/health', '/health'], (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ── Root API Info ────────────────────────────
+app.get(['/api', '/'], (_req, res) => {
+  res.json({
+    name: 'CodeReview AI API',
+    status: 'running',
+    routes: ['/api/health', '/api/review', '/api/history'],
+  });
+});
+
 // ── Routes ───────────────────────────────────
 app.use(['/api/review', '/review'], reviewRoutes);
 app.use(['/api/history', '/history'], historyRoutes);
@@ -65,4 +85,8 @@ app.use((_req, res) => {
 // ── Global Error Handler ─────────────────────
 app.use(errorHandler);
 
+// Export Express app for local server usage
 export default app;
+
+// Export a serverless handler (some platforms look for named handlers)
+export const handler = (req, res) => app(req, res);
